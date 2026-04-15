@@ -1,0 +1,232 @@
+{
+  "version": "1.0",
+  "pipeline_name": "customer_pipeline",
+  "nodes": [
+    {
+      "name": "collect_a",
+      "plugin": "collect_a",
+      "enabled": true,
+      "depends_on": [],
+      "inputs": {},
+      "options": {},
+      "schema_refs": {
+        "inputs": {},
+        "output": "customer_base"
+      },
+      "tags": [
+        "source"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "collect_b",
+      "plugin": "collect_b",
+      "enabled": true,
+      "depends_on": [],
+      "inputs": {},
+      "options": {},
+      "schema_refs": {
+        "inputs": {},
+        "output": "allowed_id_base"
+      },
+      "tags": [
+        "source"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "collect_c",
+      "plugin": "collect_c",
+      "enabled": true,
+      "depends_on": [],
+      "inputs": {},
+      "options": {},
+      "schema_refs": {
+        "inputs": {},
+        "output": "score_base"
+      },
+      "tags": [
+        "source"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "a_trim_name",
+      "plugin": "trim_field",
+      "enabled": true,
+      "depends_on": [
+        "collect_a"
+      ],
+      "inputs": {
+        "source": "collect_a"
+      },
+      "options": {
+        "source_key": "source",
+        "field": "name"
+      },
+      "schema_refs": {
+        "inputs": {
+          "source": "customer_base"
+        },
+        "output": "customer_base"
+      },
+      "tags": [
+        "normalize"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "a_lower_name",
+      "plugin": "lowercase_field",
+      "enabled": true,
+      "depends_on": [
+        "a_trim_name"
+      ],
+      "inputs": {
+        "source": "a_trim_name"
+      },
+      "options": {
+        "source_key": "source",
+        "field": "name"
+      },
+      "schema_refs": {
+        "inputs": {
+          "source": "customer_base"
+        },
+        "output": "customer_base"
+      },
+      "tags": [
+        "normalize"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "c_joinable",
+      "plugin": "filter_required_fields",
+      "enabled": true,
+      "depends_on": [
+        "collect_c"
+      ],
+      "inputs": {
+        "source": "collect_c"
+      },
+      "options": {
+        "source_key": "source",
+        "required_fields": [
+          "id",
+          "score",
+          "grade"
+        ]
+      },
+      "schema_refs": {
+        "inputs": {
+          "source": "score_base"
+        },
+        "output": "score_base"
+      },
+      "tags": [
+        "filter"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "merge_ac",
+      "plugin": "join_on_key",
+      "enabled": true,
+      "depends_on": [
+        "a_lower_name",
+        "c_joinable"
+      ],
+      "inputs": {
+        "left": "a_lower_name",
+        "right": "c_joinable"
+      },
+      "options": {
+        "left_input": "left",
+        "right_input": "right",
+        "left_key": "id",
+        "right_key": "id",
+        "join_type": "inner",
+        "right_prefix": "c_"
+      },
+      "schema_refs": {
+        "inputs": {
+          "left": "customer_base",
+          "right": "score_base"
+        },
+        "output": "joined_ac"
+      },
+      "tags": [
+        "join",
+        "report"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "filter_with_b",
+      "plugin": "filter_by_reference",
+      "enabled": true,
+      "depends_on": [
+        "merge_ac",
+        "collect_b"
+      ],
+      "inputs": {
+        "main": "merge_ac",
+        "reference": "collect_b"
+      },
+      "options": {
+        "main_input": "main",
+        "ref_input": "reference",
+        "main_key": "id",
+        "ref_key": "allowed_id"
+      },
+      "schema_refs": {
+        "inputs": {
+          "main": "joined_ac",
+          "reference": "allowed_id_base"
+        },
+        "output": "joined_ac"
+      },
+      "tags": [
+        "filter",
+        "report"
+      ],
+      "cache": true,
+      "cache_ttl_seconds": 300
+    },
+    {
+      "name": "output",
+      "plugin": "print_result",
+      "enabled": true,
+      "depends_on": [
+        "filter_with_b"
+      ],
+      "inputs": {
+        "final_data": "filter_with_b"
+      },
+      "options": {
+        "source_key": "final_data",
+        "title": "FILTERED MERGED RESULT"
+      },
+      "schema_refs": {
+        "inputs": {
+          "final_data": "joined_ac"
+        },
+        "output": "joined_ac"
+      },
+      "tags": [
+        "sink",
+        "report"
+      ],
+      "cache": false,
+      "cache_ttl_seconds": null
+    }
+  ]
+}
